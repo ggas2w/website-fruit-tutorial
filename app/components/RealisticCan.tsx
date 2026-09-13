@@ -16,7 +16,7 @@ export interface RealisticCanProps {
  * V é reservado pro "corpo reto" (onde o rótulo vai). */
 const BASE_SEGMENTS = 4;
 const BODY_SEGMENTS = 36;
-const TOP_SEGMENTS = 6;
+const TOP_SEGMENTS = 4;
 const TOTAL_SEGMENTS = BASE_SEGMENTS + BODY_SEGMENTS + TOP_SEGMENTS;
 
 /** Faixa (em V, 0=base/1=topo) onde o corpo reto vive — é aqui que o rótulo
@@ -31,7 +31,9 @@ const PAINT_BAND_HEIGHT_V = BODY_SEGMENTS / TOTAL_SEGMENTS;
  * precisa ocupar só a fração da circunferência que realmente aparece de
  * frente, senão fica esticado pelas 360° e a câmera só mostra um pedaço
  * ampliado/cortado dele (era o bug do "logo grande demais/cortado"). */
-const LOGO_WIDTH_FRAC = 0.34;
+const LOGO_WIDTH_FRAC = 0.3;
+/** Esticão extra na altura por cima da proporção natural da imagem. */
+const LOGO_HEIGHT_BOOST = 1.25;
 
 const BODY_Y_START = 0.09;
 const BODY_Y_END = 3.55;
@@ -48,14 +50,7 @@ function buildCanProfile(): THREE.Vector2[] {
     const y = BODY_Y_START + ((BODY_Y_END - BODY_Y_START) * i) / BODY_SEGMENTS;
     points.push([1, y]);
   }
-  points.push(
-    [0.94, 3.64],
-    [0.86, 3.72],
-    [0.78, 3.78],
-    [0.7, 3.83],
-    [0.62, 3.89],
-    [0, PROFILE_HEIGHT]
-  );
+  points.push([0.85, 3.65], [0.62, 3.78], [0.28, 3.88], [0, PROFILE_HEIGHT]);
   return points.map(([r, y]) => new THREE.Vector2(r, y - PROFILE_HEIGHT / 2));
 }
 
@@ -104,12 +99,14 @@ function compositeCanTexture(
   ctx.fillRect(0, bandTop, w, bandH);
 
   // rótulo centralizado numa faixa estreita da largura (a fração da volta
-  // inteira que fica de frente pra câmera) — na proporção NATURAL da
-  // própria imagem (sem esticar/achatar artificialmente), assim ele aparece
-  // INTEIRO e com as formas certas, em vez de espremido pelas 360°.
+  // inteira que fica de frente pra câmera) — partindo da proporção NATURAL
+  // da própria imagem, com um leve "esticão" extra na altura (LOGO_HEIGHT_
+  // BOOST) pra compensar o achatamento que a inclinação da lata (rotationX)
+  // causa por perspectiva, já que ainda parecia achatado mesmo com a
+  // proporção 1:1 correta.
   if (labelImg && labelImg.complete && labelImg.naturalWidth > 0) {
     const logoW = w * LOGO_WIDTH_FRAC;
-    const logoH = logoW * (labelImg.naturalHeight / labelImg.naturalWidth);
+    const logoH = logoW * (labelImg.naturalHeight / labelImg.naturalWidth) * LOGO_HEIGHT_BOOST;
     const logoX = (w - logoW) / 2;
     const logoY = bandTop + (bandH - logoH) / 2;
     ctx.drawImage(labelImg, logoX, logoY, logoW, logoH);
