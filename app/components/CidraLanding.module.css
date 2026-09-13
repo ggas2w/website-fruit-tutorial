@@ -1,0 +1,203 @@
+.stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  transition: none;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- fundo em painéis ---------- */
+
+.bgStrip {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.bgPanel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+}
+
+/* ---------- palavra gigante ---------- */
+
+.wordStrip {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.wordPanel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.word {
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(5rem, 17vw, 14rem);
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  mix-blend-mode: overlay;
+  white-space: nowrap;
+}
+
+/* ---------- frutas ---------- */
+
+.fruitLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+
+.fruitLayerFront {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.fruitOuter {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+.fruitImg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ---------- folha ---------- */
+
+.leaf {
+  position: absolute;
+  z-index: 26;
+  height: auto;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* ---------- lata ---------- */
+
+.canParallax {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.canWrap {
+  position: relative;
+  width: clamp(200px, 25vw, 360px);
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: pan-y;
+}
+
+.canWrap:active {
+  cursor: grabbing;
+}
+
+.canBase,
+.canShade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.canShade {
+  mix-blend-mode: multiply;
+  opacity: 0.85;
+}
+
+.canCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  -webkit-mask-image: url("/can-photo.png");
+  mask-image: url("/can-photo.png");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-mode: alpha;
+  mask-mode: alpha;
+}
+
+/* ---------- indicadores ---------- */
+
+.dots {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(20px, 4vh, 40px);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 40;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.dot:hover {
+  transform: scale(1.15);
+}
+
+.dot[data-active="true"] {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+/* ---------- dica de teclado/arraste ---------- */
+
+.hint {
+  position: absolute;
+  top: clamp(20px, 4vh, 36px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
