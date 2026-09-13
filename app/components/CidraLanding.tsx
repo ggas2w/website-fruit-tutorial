@@ -338,7 +338,7 @@ export default function CidraLanding() {
       <motion.div className={styles.wordStrip} style={{ x: stripX }}>
         {FLAVOR_ORDER.map((id, i) => (
           <div key={id} className={styles.wordPanel} style={{ left: `${i * 100}%` }}>
-            <span className={styles.word} style={{ color: FLAVORS[id].wordColor }}>
+            <span className={styles.word} style={{ backgroundImage: FLAVORS[id].wordGradient }}>
               {FLAVORS[id].label}
             </span>
           </div>
