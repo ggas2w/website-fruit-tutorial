@@ -395,8 +395,6 @@ export default function CidraLanding() {
         </AnimatePresence>
       </div>
 
-      <p className={styles.hint}>Arraste, clique na lata ou use as setas</p>
-
       <div className={styles.dots}>
         {FLAVOR_ORDER.map((id, i) => (
           <button
