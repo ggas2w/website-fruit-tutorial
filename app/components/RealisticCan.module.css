@@ -1,0 +1,16 @@
+.host {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  touch-action: none;
+}
+
+.host[data-dragging="true"] {
+  cursor: grabbing;
+}
+
+.host canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
