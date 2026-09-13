@@ -106,19 +106,21 @@ function Fruit({ fruit }: { fruit: FruitConfig }) {
 }
 
 function Leaf({ slot }: { slot: LeafSlot }) {
+  const target = {
+    left: `${slot.xPct}%`,
+    top: `${slot.yPct}%`,
+    rotate: slot.rotationDeg,
+    width: slot.widthPx,
+    scaleX: slot.mirrored ? -1 : 1,
+  };
   return (
     <motion.img
       src="/leaf.png"
       alt=""
       draggable={false}
       className={styles.leaf}
-      animate={{
-        left: `${slot.xPct}%`,
-        top: `${slot.yPct}%`,
-        rotate: slot.rotationDeg,
-        width: slot.widthPx,
-        scaleX: slot.mirrored ? -1 : 1,
-      }}
+      initial={target}
+      animate={target}
       transition={MAIN_SPRING}
     />
   );
@@ -250,7 +252,7 @@ export default function CidraLanding() {
     const offsetPx = progress.get() * LABEL_WIDTH_PX;
 
     for (let x = 0; x < width; x += SLICE_PX) {
-      const raw = offsetPx + x - centerShift;
+      const raw = offsetPx + x + centerShift;
       const stripPos = mod(raw, totalStripW);
       const idx = Math.floor(stripPos / LABEL_WIDTH_PX);
       const img = labelImgsRef.current[idx];
@@ -343,8 +345,6 @@ export default function CidraLanding() {
 
       {/* folhas + lata, com parallax contrário */}
       <motion.div className={styles.canParallax} style={{ x: canParallaxX, y: canParallaxY }}>
-        <Leaf slot={flavor.leaves[0]} />
-
         <motion.div
           ref={canWrapRef}
           className={styles.canWrap}
@@ -360,9 +360,9 @@ export default function CidraLanding() {
           <img src="/can-photo.png" alt="" className={styles.canBase} draggable={false} />
           <canvas ref={canvasRef} className={styles.canCanvas} />
           <img src="/can-photo.png" alt="" className={styles.canShade} draggable={false} />
+          <Leaf slot={flavor.leaves[0]} />
+          <Leaf slot={flavor.leaves[1]} />
         </motion.div>
-
-        <Leaf slot={flavor.leaves[1]} />
       </motion.div>
 
       {/* frutas na frente da lata, fora de foco */}
