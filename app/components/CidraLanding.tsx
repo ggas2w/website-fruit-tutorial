@@ -28,13 +28,18 @@ import {
 } from "../data/flavors";
 import styles from "./CidraLanding.module.css";
 
-/** Onde, dentro da altura da lata, o rótulo é desenhado (fração 0-1). */
-const LABEL_BAND_TOP = 0.3;
-const LABEL_BAND_HEIGHT = 0.46;
+/** Onde, dentro da altura da lata, o rótulo é desenhado (fração 0-1).
+ * Cobre quase toda a lata (só sobra o ombro de cima e a base), como
+ * um rótulo impresso de verdade, em vez de uma faixa fina colada no meio. */
+const LABEL_BAND_TOP = 0.09;
+const LABEL_BAND_HEIGHT = 0.82;
+/** Quanto o rótulo "encolhe" na vertical perto das bordas esquerda/direita,
+ * simulando a curvatura do cilindro da lata (0 = sem curva, 1 = full). */
+const LABEL_CURVE = 0.12;
 /** Largura de cada fatia desenhada no canvas. */
 const SLICE_PX = 4;
 /** Fade nas bordas esquerda/direita do canvas, em px. */
-const EDGE_FADE_PX = 30;
+const EDGE_FADE_PX = 36;
 /** Spring (mais leve/rápida) usada só pro parallax do mouse. */
 const PARALLAX_SPRING = { stiffness: 55, damping: 14, mass: 0.6 };
 /** Distância de arraste, em px, pra trocar de sabor. */
@@ -250,6 +255,7 @@ export default function CidraLanding() {
     const totalStripW = LABEL_WIDTH_PX * FLAVOR_ORDER.length;
     const centerShift = (LABEL_WIDTH_PX - width) / 2;
     const offsetPx = progress.get() * LABEL_WIDTH_PX;
+    const halfWidth = width / 2;
 
     for (let x = 0; x < width; x += SLICE_PX) {
       const raw = offsetPx + x + centerShift;
@@ -264,7 +270,14 @@ export default function CidraLanding() {
       const sw = Math.max(1, SLICE_PX * scale);
       const dw = Math.min(SLICE_PX, width - x);
 
-      ctx.drawImage(img, sx, 0, sw, img.naturalHeight, x, bandTop, dw, bandH);
+      // encolhe a fatia perto das bordas pra simular o rótulo curvando
+      // junto com o cilindro da lata, em vez de ficar reto feito adesivo.
+      const t = (x + dw / 2 - halfWidth) / halfWidth;
+      const taper = 1 - LABEL_CURVE * t * t;
+      const sliceH = bandH * taper;
+      const sliceTop = bandTop + (bandH - sliceH) / 2;
+
+      ctx.drawImage(img, sx, 0, sw, img.naturalHeight, x, sliceTop, dw, sliceH);
     }
 
     // fade nas bordas: some com o rótulo revelando a sombra natural da lata
@@ -329,7 +342,9 @@ export default function CidraLanding() {
       <motion.div className={styles.wordStrip} style={{ x: stripX }}>
         {FLAVOR_ORDER.map((id, i) => (
           <div key={id} className={styles.wordPanel} style={{ left: `${i * 100}%` }}>
-            <span className={styles.word}>{FLAVORS[id].label}</span>
+            <span className={styles.word} style={{ color: FLAVORS[id].wordColor }}>
+              {FLAVORS[id].label}
+            </span>
           </div>
         ))}
       </motion.div>

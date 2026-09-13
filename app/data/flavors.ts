@@ -60,6 +60,8 @@ export interface FlavorConfig {
   label: string;
   /** Cor de fundo do painel deste sabor. */
   background: string;
+  /** Cor da palavra gigante atrás da lata (precisa contrastar com `background`). */
+  wordColor: string;
   /** Rótulo plano (636px) usado na faixa do canvas. */
   labelSrc: string;
   fruits: FruitConfig[];
@@ -72,6 +74,7 @@ export const FLAVORS: Record<FlavorId, FlavorConfig> = {
     id: "pear",
     label: "Pear",
     background: "#c9e78a",
+    wordColor: "rgba(255, 255, 255, 0.9)",
     labelSrc: "/label-pear.png",
     fruits: [
       {
@@ -128,6 +131,7 @@ export const FLAVORS: Record<FlavorId, FlavorConfig> = {
     id: "apple",
     label: "Apple",
     background: "#ffa3be",
+    wordColor: "rgba(150, 38, 38, 0.55)",
     labelSrc: "/label-apple.png",
     fruits: [
       {
@@ -184,6 +188,7 @@ export const FLAVORS: Record<FlavorId, FlavorConfig> = {
     id: "exotic",
     label: "Exotic",
     background: "#c1beff",
+    wordColor: "rgba(255, 255, 255, 0.9)",
     labelSrc: "/label-exotic.png",
     fruits: [
       {

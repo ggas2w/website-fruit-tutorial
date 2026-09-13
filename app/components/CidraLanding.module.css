@@ -57,10 +57,8 @@
   font-family: var(--font-display), sans-serif;
   font-size: clamp(5rem, 17vw, 14rem);
   line-height: 1;
-  color: rgba(255, 255, 255, 0.55);
   text-transform: uppercase;
   letter-spacing: -0.02em;
-  mix-blend-mode: overlay;
   white-space: nowrap;
 }
 
