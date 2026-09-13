@@ -325,24 +325,34 @@ export default function CidraLanding() {
 
       {/* fundo em painéis, com transição de cor */}
       <motion.div className={styles.bgStrip} style={{ x: stripX }}>
-        {FLAVOR_ORDER.map((id, i) => (
-          <div
-            key={id}
-            className={styles.bgPanel}
-            style={{ left: `${i * 100}%`, backgroundColor: FLAVORS[id].background }}
-          />
-        ))}
+        {FLAVOR_ORDER.map((id, i) => {
+          // reposiciona cada painel sempre pertinho do índice atual (em vez de um
+          // "i * 100%" fixo), pra faixa nunca sair da janela visível depois de
+          // muitos cliques — flavorIndex cresce/diminui sem limite, só os 3
+          // painéis reais existem, então eles precisam "seguir" o ciclo.
+          const slot = flavorIndex + shortestDelta(currentMod, i, FLAVOR_ORDER.length);
+          return (
+            <div
+              key={id}
+              className={styles.bgPanel}
+              style={{ left: `${slot * 100}%`, backgroundColor: FLAVORS[id].background }}
+            />
+          );
+        })}
       </motion.div>
 
       {/* palavra gigante, na mesma proporção da faixa do rótulo */}
       <motion.div className={styles.wordStrip} style={{ x: stripX }}>
-        {FLAVOR_ORDER.map((id, i) => (
-          <div key={id} className={styles.wordPanel} style={{ left: `${i * 100}%` }}>
-            <span className={styles.word} style={{ backgroundImage: FLAVORS[id].wordGradient }}>
-              {FLAVORS[id].label}
-            </span>
-          </div>
-        ))}
+        {FLAVOR_ORDER.map((id, i) => {
+          const slot = flavorIndex + shortestDelta(currentMod, i, FLAVOR_ORDER.length);
+          return (
+            <div key={id} className={styles.wordPanel} style={{ left: `${slot * 100}%` }}>
+              <span className={styles.word} style={{ color: FLAVORS[id].wordColor }}>
+                {FLAVORS[id].label}
+              </span>
+            </div>
+          );
+        })}
       </motion.div>
 
       {/* frutas atrás da lata */}

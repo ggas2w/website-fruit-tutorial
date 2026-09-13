@@ -48,6 +48,7 @@
   top: 0;
   bottom: 0;
   width: 100%;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -62,21 +63,6 @@
   letter-spacing: -0.01em;
   white-space: nowrap;
   transform: translateY(-12vh);
-
-  /* efeito "metal de lata": o preenchimento vira o gradiente metálico
-   * (definido por sabor) recortado na forma do texto. */
-  color: transparent;
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-
-  /* relevo (emboss): um brilho claro em cima/esquerda e uma sombra escura
-   * embaixo/direita, como se a letra fosse estampada na chapa. */
-  text-shadow:
-    -1.5px -2px 0 rgba(255, 255, 255, 0.55),
-    2px 3px 3px rgba(0, 0, 0, 0.3),
-    0 0 24px rgba(0, 0, 0, 0.08);
 }
 
 /* ---------- frutas ---------- */

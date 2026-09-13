@@ -60,9 +60,9 @@ export interface FlavorConfig {
   label: string;
   /** Cor de fundo do painel deste sabor. */
   background: string;
-  /** Gradiente "metálico" (efeito lata) preenchendo a palavra gigante atrás
-   * da lata via background-clip: text — precisa contrastar com `background`. */
-  wordGradient: string;
+  /** Cor sólida da palavra gigante atrás da lata — um tom mais escuro da
+   * própria cor do sabor, pra contrastar com `background` sem destoar. */
+  wordColor: string;
   /** Cor sólida "impressa" no corpo inteiro da lata (mesma cor de fundo do rótulo). */
   canColor: string;
   /** Rótulo plano (636px) usado na faixa do canvas. */
@@ -77,8 +77,7 @@ export const FLAVORS: Record<FlavorId, FlavorConfig> = {
     id: "pear",
     label: "Pear",
     background: "#c9e78a",
-    wordGradient:
-      "linear-gradient(100deg, #ffffff 0%, #e3f6cf 14%, #ffffff 28%, #9fcb6a 44%, #ffffff 58%, #cde89e 72%, #ffffff 86%, #85b34e 100%)",
+    wordColor: "#3f7a1f",
     canColor: "#e6ffde",
     labelSrc: "/label-pear.png",
     fruits: [
@@ -136,8 +135,7 @@ export const FLAVORS: Record<FlavorId, FlavorConfig> = {
     id: "apple",
     label: "Apple",
     background: "#ffa3be",
-    wordGradient:
-      "linear-gradient(100deg, #ffffff 0%, #ffc9c9 12%, #ffffff 26%, #a83232 42%, #ffffff 58%, #ff9a9a 74%, #ffffff 88%, #7a1f1f 100%)",
+    wordColor: "#8c2020",
     canColor: "#ff6464",
     labelSrc: "/label-apple.png",
     fruits: [
@@ -195,8 +193,7 @@ export const FLAVORS: Record<FlavorId, FlavorConfig> = {
     id: "exotic",
     label: "Exotic",
     background: "#c1beff",
-    wordGradient:
-      "linear-gradient(100deg, #ffffff 0%, #dcdaff 14%, #ffffff 28%, #6d6ae0 44%, #ffffff 58%, #c2c0ff 72%, #ffffff 86%, #4b48b8 100%)",
+    wordColor: "#4b3f96",
     canColor: "#9494ff",
     labelSrc: "/label-exotic.png",
     fruits: [
