@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Anton, Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Poppins } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -12,9 +12,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const displayFont = Anton({
+const displayFont = Poppins({
   variable: "--font-display",
-  weight: "400",
+  weight: "800",
   subsets: ["latin"],
 });
 
