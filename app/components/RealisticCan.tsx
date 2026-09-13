@@ -10,22 +10,32 @@ export interface RealisticCanProps {
   flavorId: FlavorId;
 }
 
-/** Onde, dentro da altura da lata, o rótulo aparece (fração 0-1) — os mesmos
- * números usados na composição plana (CSS) que já estava aprovada: o rótulo
- * cobre do "ombro" até perto da base, deixando metal nu acima/abaixo. */
-const LABEL_TOP_FRAC = 0.09;
-const LABEL_HEIGHT_FRAC = 0.78;
-
 /** Segmentos do perfil da lata (raio, altura) — a LatheGeometry do three.js
  * reparte a coordenada V da textura em fatias IGUAIS por ponto do perfil,
- * não por distância real percorrida. As contagens abaixo foram escolhidas
- * pra que a fração de V reservada pro "corpo reto" bata com LABEL_TOP/
- * HEIGHT_FRAC acima — senão o rótulo (que é a MESMA arte da versão plana)
- * sai espremido/deslocado do lugar onde ele deveria ficar na malha 3D. */
+ * não por distância real percorrida. As contagens abaixo definem quanto de
+ * V é reservado pro "corpo reto" (onde o rótulo vai). */
 const BASE_SEGMENTS = 4;
 const BODY_SEGMENTS = 36;
 const TOP_SEGMENTS = 6;
 const TOTAL_SEGMENTS = BASE_SEGMENTS + BODY_SEGMENTS + TOP_SEGMENTS;
+
+/** Faixa (em V, 0=base/1=topo) onde o corpo reto vive — é aqui que o rótulo
+ * precisa cair, senão parte dele escorrega pro ombro/gargalo (raio
+ * encolhendo) e sai espremido/distorcido. */
+const PAINT_BAND_TOP_V = BASE_SEGMENTS / TOTAL_SEGMENTS;
+const PAINT_BAND_HEIGHT_V = BODY_SEGMENTS / TOTAL_SEGMENTS;
+
+/** A textura dá a volta 360° na lata — só uma fatia dela fica de frente pra
+ * câmera de cada vez. Na versão plana o rótulo cobria a largura toda da
+ * lata (é uma imagem só de frente, sem "resto do cilindro"); aqui ele
+ * precisa ocupar só a fração da circunferência que realmente aparece de
+ * frente, senão fica esticado pelas 360° e a câmera só mostra um pedaço
+ * ampliado/cortado dele (era o bug do "logo grande demais/cortado"). */
+const LOGO_WIDTH_FRAC = 0.34;
+/** Mesma proporção largura:altura usada na versão plana (câmera de largura
+ * toda x 78% da altura), só que aplicada à largura menor do logo aqui —
+ * assim o rótulo não fica nem mais espichado nem mais achatado que antes. */
+const LABEL_FLAT_ASPECT = 639 / (1195 * 0.78);
 
 const BODY_Y_START = 0.09;
 const BODY_Y_END = 3.55;
@@ -59,22 +69,22 @@ function buildCanProfile(): THREE.Vector2[] {
  * giro contínuo. */
 const REST_ROTATION_Y = Math.PI;
 const ENTRANCE_DURATION = 1.3;
-const START = { rotX: 0.12, rotY: REST_ROTATION_Y - 0.4, rotZ: 0.15, posY: -0.9, scale: 0.82 };
-const REST = { rotX: 0.32, rotY: REST_ROTATION_Y - 0.15, rotZ: -0.26, posY: 0, scale: 1 };
+const START = { rotX: 0.12, rotY: REST_ROTATION_Y - 0.4, rotZ: 0.15, posY: -0.9, scale: 0.5 };
+const REST = { rotX: 0.32, rotY: REST_ROTATION_Y - 0.15, rotZ: -0.26, posY: 0, scale: 0.68 };
 
 function easeOutExpo(t: number) {
   return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
 }
 
-/** Recria, num canvas 2D, exatamente a mesma composição usada na versão
- * plana (a "fonte da verdade" visual): foto da lata como base, o MESMO
- * rótulo recortado pela silhueta da lata e posicionado na mesma faixa, e a
- * mesma foto de novo por cima em multiply pro brilho/gotas — a arte não
- * muda em nada, só passa a ser a textura de uma malha 3D de verdade em vez
- * de uma imagem plana. */
+/** Recria, num canvas 2D, a mesma composição visual da versão plana (a
+ * "fonte da verdade"): foto da lata pro metal/aros/gotas, corpo pintado na
+ * cor do sabor, e o MESMO rótulo por cima — só que agora ocupando a fração
+ * de circunferência que fica de frente pra câmera, não a volta 360° toda
+ * (a arte em si não muda, só a largura que ela ocupa no "embrulho" 3D). */
 function compositeCanTexture(
   canPhoto: HTMLImageElement,
   labelImg: HTMLImageElement | null,
+  canColor: string,
   w: number,
   h: number
 ): HTMLCanvasElement {
@@ -85,24 +95,28 @@ function compositeCanTexture(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  // base: a foto da lata (metal, sombra, gotas, aros)
+  // base: a foto da lata (metal, sombra, gotas, aros de cima/baixo)
   ctx.drawImage(canPhoto, 0, 0, w, h);
 
-  if (labelImg && labelImg.complete && labelImg.naturalWidth > 0) {
-    // rótulo desenhado numa camada separada, depois recortado pela
-    // silhueta (alpha) da própria foto da lata — igual ao mask-image usado
-    // na versão em CSS.
-    const labelLayer = document.createElement("canvas");
-    labelLayer.width = w;
-    labelLayer.height = h;
-    const lctx = labelLayer.getContext("2d")!;
-    lctx.imageSmoothingEnabled = true;
-    lctx.imageSmoothingQuality = "high";
-    lctx.drawImage(labelImg, 0, h * LABEL_TOP_FRAC, w, h * LABEL_HEIGHT_FRAC);
-    lctx.globalCompositeOperation = "destination-in";
-    lctx.drawImage(canPhoto, 0, 0, w, h);
+  // corpo pintado na cor sólida do sabor, na faixa correspondente ao corpo
+  // reto do perfil (CanvasTexture usa flipY por padrão: V=0 lê a ÚLTIMA
+  // linha do canvas, V=1 lê a PRIMEIRA — por isso a conta abaixo espelha a
+  // fração de V em vez de usar ela direto como um "top" de CSS).
+  const bandTop = h * (1 - (PAINT_BAND_TOP_V + PAINT_BAND_HEIGHT_V));
+  const bandH = h * PAINT_BAND_HEIGHT_V;
+  ctx.fillStyle = canColor;
+  ctx.fillRect(0, bandTop, w, bandH);
 
-    ctx.drawImage(labelLayer, 0, 0);
+  // rótulo centralizado numa faixa estreita da largura (a fração da volta
+  // inteira que fica de frente pra câmera), na mesma proporção largura:
+  // altura da versão plana — assim ele aparece INTEIRO, sem cortar nas
+  // bordas, em vez de esticado pelas 360° e só um pedaço ampliado visível.
+  if (labelImg && labelImg.complete && labelImg.naturalWidth > 0) {
+    const logoW = w * LOGO_WIDTH_FRAC;
+    const logoH = logoW / LABEL_FLAT_ASPECT;
+    const logoX = (w - logoW) / 2;
+    const logoY = bandTop + (bandH - logoH) / 2;
+    ctx.drawImage(labelImg, logoX, logoY, logoW, logoH);
   }
 
   // a mesma foto de novo, em multiply, pro brilho/sombra/gotas (canShade)
@@ -178,7 +192,7 @@ export default function RealisticCan({ flavorId }: RealisticCanProps) {
       if (!canPhoto.complete || canPhoto.naturalWidth === 0) return;
       const w = 1024;
       const h = Math.round((w * canPhoto.naturalHeight) / canPhoto.naturalWidth);
-      const composed = compositeCanTexture(canPhoto, labelImg, w, h);
+      const composed = compositeCanTexture(canPhoto, labelImg, flavor.canColor, w, h);
       if (texture) texture.dispose();
       texture = new THREE.CanvasTexture(composed);
       texture.colorSpace = THREE.SRGBColorSpace;
