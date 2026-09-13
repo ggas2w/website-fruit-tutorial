@@ -50,28 +50,31 @@ function buildCanProfile(): THREE.Vector2[] {
 const PAINT_BAND_TOP = BASE_SEGMENTS / TOTAL_SEGMENTS;
 const PAINT_BAND_HEIGHT = BODY_SEGMENTS / TOTAL_SEGMENTS;
 
+/** Resolução da textura pintada — bem maior que o necessário pra tela, pra o
+ * logo sair nítido mesmo bem ampliado (era a causa do "borrado"). */
+const TEXTURE_SIZE = 2048;
+
 /** Largura do logo em fração da CIRCUNFERÊNCIA INTEIRA (a textura dá a volta
  * 360° na lata) — não é fração da largura "de frente" como numa arte 2D
- * achatada. ~85° de arco. */
-const LOGO_WIDTH_FRAC = 0.24;
+ * achatada. Maior/mais proeminente, igual à lata da 1ª seção. */
+const LOGO_WIDTH_FRAC = 0.32;
 /** Altura do logo em fração da faixa pintada (independente da largura). */
-const LOGO_HEIGHT_FRAC = 0.46;
+const LOGO_HEIGHT_FRAC = 0.62;
 
 /** Ajusta pra a frente pintada (onde fica o logo) já nascer virada pra câmera. */
 const REST_ROTATION_Y = Math.PI;
 
-/** ---- animação de entrada ao rolar a página até a seção ---- */
-const ENTRANCE_DURATION = 1.3; // segundos
-const START = { rotX: -0.5, rotY: REST_ROTATION_Y - 0.85, rotZ: 0.3, posY: -1.3, scale: 0.48 };
-const REST = { rotX: 0, rotY: REST_ROTATION_Y, rotZ: 0, posY: 0, scale: 0.62 };
+/** ---- animação de entrada ao rolar a página até a seção ----
+ * A lata nasce menor, mais baixa e só levemente girada, e assenta numa
+ * pose final em diagonal (inspirada no vídeo de referência: lata inclinada,
+ * mostrando o aro de cima, em vez de ficar reta feito soldadinho). */
+const ENTRANCE_DURATION = 1.4; // segundos
+const START = { rotX: 0.12, rotY: REST_ROTATION_Y - 0.5, rotZ: 0.18, posY: -1.1, scale: 0.5 };
+const REST = { rotX: 0.32, rotY: REST_ROTATION_Y - 0.15, rotZ: -0.26, posY: 0, scale: 0.68 };
 
-/** Easing com um leve "overshoot" no final, pra lata assentar suavemente
- * em vez de simplesmente parar — dá a sensação de objeto de verdade. */
-function easeOutBack(t: number) {
-  const c1 = 1.70158;
-  const c3 = c1 + 1;
-  const x = t - 1;
-  return 1 + c3 * x * x * x + c1 * x * x;
+/** Easing suave (sem "quique"), pra um assentar mais cinematográfico. */
+function easeOutExpo(t: number) {
+  return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
 }
 
 function paintCanTexture(
@@ -79,9 +82,12 @@ function paintCanTexture(
   w: number,
   h: number,
   flavor: FlavorConfig,
+  dropletsImg: HTMLImageElement | null,
   logoImg: HTMLImageElement | null
 ) {
   ctx.clearRect(0, 0, w, h);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
 
   // alumínio nu (topo/base, onde a lata de verdade não recebe tinta)
   const metal = ctx.createLinearGradient(0, 0, 0, h);
@@ -99,7 +105,18 @@ function paintCanTexture(
   ctx.fillStyle = flavor.canColor;
   ctx.fillRect(0, bandTop, w, bandH);
 
-  // logo centralizado, impresso por cima
+  // gotas d'água da mesma foto usada na 1ª seção, esticada na largura toda
+  // (dá a volta 360°; a distorção na "parte de trás" nunca aparece já que a
+  // lata não gira) — dá o MESMO acabamento fotográfico das duas seções.
+  if (dropletsImg && dropletsImg.complete && dropletsImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.globalAlpha = 0.55;
+    ctx.drawImage(dropletsImg, 0, 0, w, h);
+    ctx.restore();
+  }
+
+  // logo por cima, nítido e em opacidade total — nunca some sob as gotas.
   if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
     const logoW = w * LOGO_WIDTH_FRAC;
     const logoH = bandH * LOGO_HEIGHT_FRAC;
@@ -119,52 +136,60 @@ export default function RealisticCan({ flavorId }: RealisticCanProps) {
     const flavor = FLAVORS[flavorId];
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 20);
-    camera.position.set(0, 0.05, 7.4);
+    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
+    camera.position.set(0, 0.05, 8.2);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 0.95;
     host.appendChild(renderer.domElement);
 
-    // ambiente de estúdio (dá reflexo/realce metálico sem precisar de um HDRI externo)
+    // ambiente de estúdio bem discreto — só o suficiente pra dar volume ao
+    // metal sem criar reflexos fortes que lavem o rótulo.
     const pmrem = new THREE.PMREMGenerator(renderer);
-    const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.09).texture;
     scene.environment = envTexture;
 
-    const key = new THREE.DirectionalLight(0xffffff, 2.4);
-    key.position.set(3.5, 4, 5);
+    const key = new THREE.DirectionalLight(0xffffff, 1.15);
+    key.position.set(3, 3.5, 5);
     scene.add(key);
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.7);
-    fillLight.position.set(-4, -1.5, 2.5);
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    fillLight.position.set(-4, -1, 2.5);
     scene.add(fillLight);
-    const rim = new THREE.DirectionalLight(0xffffff, 0.9);
-    rim.position.set(-2, 2, -4);
-    scene.add(rim);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.28));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
 
-    // textura pintada num canvas 2D, atualizada quando o rótulo carregar
+    // textura pintada num canvas 2D, atualizada conforme as imagens carregam
     const texCanvas = document.createElement("canvas");
-    texCanvas.width = 1024;
-    texCanvas.height = 1024;
+    texCanvas.width = TEXTURE_SIZE;
+    texCanvas.height = TEXTURE_SIZE;
     const ctx2d = texCanvas.getContext("2d")!;
-    paintCanTexture(ctx2d, texCanvas.width, texCanvas.height, flavor, null);
+    paintCanTexture(ctx2d, texCanvas.width, texCanvas.height, flavor, null, null);
 
     const texture = new THREE.CanvasTexture(texCanvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
     texture.needsUpdate = true;
 
-    const logoImg = new Image();
-    logoImg.onload = () => {
-      paintCanTexture(ctx2d, texCanvas.width, texCanvas.height, flavor, logoImg);
+    let dropletsImg: HTMLImageElement | null = null;
+    let logoImg: HTMLImageElement | null = null;
+    const redraw = () => {
+      paintCanTexture(ctx2d, texCanvas.width, texCanvas.height, flavor, dropletsImg, logoImg);
       texture.needsUpdate = true;
-      // não espera o próximo tick do loop pra mostrar o rótulo assim que a
-      // imagem carrega (ex.: aba em segundo plano, onde o rAF fica bem lento).
+      // não espera o próximo tick do loop pra mostrar assim que a imagem
+      // carrega (ex.: aba em segundo plano, onde o rAF fica bem lento).
       renderer.render(scene, camera);
     };
+
+    dropletsImg = new Image();
+    dropletsImg.onload = redraw;
+    dropletsImg.src = "/can-photo.png";
+
+    logoImg = new Image();
+    logoImg.onload = redraw;
     logoImg.src = flavor.labelSrc;
 
     // corpo da lata: perfil revolucionado (dá o ombro/base curvos de verdade)
@@ -173,11 +198,11 @@ export default function RealisticCan({ flavorId }: RealisticCanProps) {
 
     const material = new THREE.MeshPhysicalMaterial({
       map: texture,
-      metalness: 0.75,
-      roughness: 0.32,
-      clearcoat: 0.3,
-      clearcoatRoughness: 0.25,
-      envMapIntensity: 1.1,
+      metalness: 0.45,
+      roughness: 0.52,
+      clearcoat: 0.12,
+      clearcoatRoughness: 0.45,
+      envMapIntensity: 0.45,
     });
 
     const can = new THREE.Mesh(geometry, material);
@@ -216,7 +241,7 @@ export default function RealisticCan({ flavorId }: RealisticCanProps) {
     const animate = () => {
       if (!entranceDone && entranceStart !== null) {
         const t = Math.min((performance.now() - entranceStart) / 1000 / ENTRANCE_DURATION, 1);
-        const e = easeOutBack(t);
+        const e = easeOutExpo(t);
         can.rotation.x = THREE.MathUtils.lerp(START.rotX, REST.rotX, e);
         can.rotation.y = THREE.MathUtils.lerp(START.rotY, REST.rotY, e);
         can.rotation.z = THREE.MathUtils.lerp(START.rotZ, REST.rotZ, e);
