@@ -77,7 +77,7 @@ export const FLAVORS: Record<FlavorId, FlavorConfig> = {
     id: "pear",
     label: "Pear",
     background: "#c9e78a",
-    wordColor: "rgba(63, 122, 31, 0.75)",
+    wordColor: "rgba(143, 199, 106, 0.85)",
     canColor: "#e6ffde",
     labelSrc: "/label-pear.png",
     fruits: [
@@ -135,7 +135,7 @@ export const FLAVORS: Record<FlavorId, FlavorConfig> = {
     id: "apple",
     label: "Apple",
     background: "#ffa3be",
-    wordColor: "rgba(140, 32, 32, 0.75)",
+    wordColor: "rgba(224, 122, 118, 0.85)",
     canColor: "#ff6464",
     labelSrc: "/label-apple.png",
     fruits: [
@@ -193,7 +193,7 @@ export const FLAVORS: Record<FlavorId, FlavorConfig> = {
     id: "exotic",
     label: "Exotic",
     background: "#c1beff",
-    wordColor: "rgba(75, 63, 150, 0.75)",
+    wordColor: "rgba(154, 146, 224, 0.85)",
     canColor: "#9494ff",
     labelSrc: "/label-exotic.png",
     fruits: [
