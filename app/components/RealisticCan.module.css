@@ -1,53 +1,11 @@
-.stage {
+.host {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   pointer-events: none;
 }
 
-.canWrap {
-  position: relative;
+.host canvas {
+  display: block;
   width: 100%;
   height: 100%;
-}
-
-.canBase,
-.canShade {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  pointer-events: none;
-  -webkit-user-drag: none;
-}
-
-.canShade {
-  mix-blend-mode: multiply;
-  opacity: 0.85;
-}
-
-.labelMask {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  -webkit-mask-image: url("/can-photo.png");
-  mask-image: url("/can-photo.png");
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-mode: alpha;
-  mask-mode: alpha;
-}
-
-.labelImg {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  object-fit: fill;
-  pointer-events: none;
-  -webkit-user-drag: none;
 }
