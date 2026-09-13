@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { FLAVORS, type FlavorConfig, type FlavorId } from "../data/flavors";
@@ -10,36 +10,69 @@ export interface RealisticCanProps {
   flavorId: FlavorId;
 }
 
-/** Perfil da lata (raio, altura), de baixo pra cima — revolucionado vira o corpo 3D. */
-const CAN_PROFILE: Array<[number, number]> = [
-  [0.0, 0.0],
-  [0.88, 0.0],
-  [0.92, 0.03],
-  [1.0, 0.09],
-  [1.0, 3.55],
-  [0.94, 3.64],
-  [0.78, 3.75],
-  [0.7, 3.8],
-  [0.7, 3.86],
-  [0.6, 3.9],
-  [0.0, 3.93],
-];
+/** Quantos segmentos do perfil (raio, altura) vão pra cada trecho da lata.
+ * A LatheGeometry do three.js reparte a coordenada V da textura de forma
+ * IGUAL entre pontos do perfil, não por distância real percorrida — sem
+ * isso, um perfil com muitos pontos no ombro/gargalo e só 2 no corpo faz
+ * o rótulo inteiro ficar espremido (e distorcido) ali no ombro, em vez de
+ * cobrir o corpo da lata. Por isso o corpo reto ganha vários pontos
+ * colineares só pra reservar a fatia de V proporcional ao tanto de altura
+ * real que ele ocupa. */
+const BASE_SEGMENTS = 2;
+const BODY_SEGMENTS = 28;
+const TOP_SEGMENTS = 6;
+const TOTAL_SEGMENTS = BASE_SEGMENTS + BODY_SEGMENTS + TOP_SEGMENTS;
+
+const BODY_Y_START = 0.09;
+const BODY_Y_END = 3.55;
 const PROFILE_HEIGHT = 3.93;
 
-/** Faixa (fração 0-1 da altura) onde a cor do sabor + logo aparecem; fora disso é alumínio nu. */
-const PAINT_BAND_TOP = 0.08;
-const PAINT_BAND_HEIGHT = 0.78;
-/** Largura do logo em fração da CIRCUNFERÊNCIA INTEIRA (textura dá a volta 360° na lata) —
- * não é fração da largura "de frente" como seria numa arte 2D achatada. ~80° de arco. */
-const LOGO_WIDTH_FRAC = 0.24;
-/** Altura do logo em fração da faixa pintada (independente da largura, pra não esticar
- * o rótulo inteiro só porque ele agora ocupa bem menos largura da textura). */
-const LOGO_HEIGHT_FRAC = 0.44;
+function buildCanProfile(): THREE.Vector2[] {
+  const points: Array<[number, number]> = [[0, 0], [0.9, 0.02], [1, BODY_Y_START]];
+  for (let i = 1; i <= BODY_SEGMENTS; i++) {
+    const y = BODY_Y_START + ((BODY_Y_END - BODY_Y_START) * i) / BODY_SEGMENTS;
+    points.push([1, y]);
+  }
+  points.push(
+    [0.94, 3.64],
+    [0.86, 3.72],
+    [0.78, 3.78],
+    [0.7, 3.83],
+    [0.62, 3.89],
+    [0, PROFILE_HEIGHT]
+  );
+  return points.map(([r, y]) => new THREE.Vector2(r, y - PROFILE_HEIGHT / 2));
+}
 
-const DRAG_SENSITIVITY = 0.01;
-const INERTIA_DECAY = 0.94;
-/** Ajuste pra a frente pintada (onde fica o logo) já nascer virada pra câmera. */
-const INITIAL_ROTATION = Math.PI;
+/** Faixa (fração 0-1 de V) onde a cor do sabor + logo aparecem — derivada
+ * direto da contagem de segmentos acima, então nunca fica dessincronizada
+ * do formato real da lata. */
+const PAINT_BAND_TOP = BASE_SEGMENTS / TOTAL_SEGMENTS;
+const PAINT_BAND_HEIGHT = BODY_SEGMENTS / TOTAL_SEGMENTS;
+
+/** Largura do logo em fração da CIRCUNFERÊNCIA INTEIRA (a textura dá a volta
+ * 360° na lata) — não é fração da largura "de frente" como numa arte 2D
+ * achatada. ~85° de arco. */
+const LOGO_WIDTH_FRAC = 0.24;
+/** Altura do logo em fração da faixa pintada (independente da largura). */
+const LOGO_HEIGHT_FRAC = 0.46;
+
+/** Ajusta pra a frente pintada (onde fica o logo) já nascer virada pra câmera. */
+const REST_ROTATION_Y = Math.PI;
+
+/** ---- animação de entrada ao rolar a página até a seção ---- */
+const ENTRANCE_DURATION = 1.3; // segundos
+const START = { rotX: -0.5, rotY: REST_ROTATION_Y - 0.85, rotZ: 0.3, posY: -1.3, scale: 0.48 };
+const REST = { rotX: 0, rotY: REST_ROTATION_Y, rotZ: 0, posY: 0, scale: 0.62 };
+
+/** Easing com um leve "overshoot" no final, pra lata assentar suavemente
+ * em vez de simplesmente parar — dá a sensação de objeto de verdade. */
+function easeOutBack(t: number) {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  const x = t - 1;
+  return 1 + c3 * x * x * x + c1 * x * x;
+}
 
 function paintCanTexture(
   ctx: CanvasRenderingContext2D,
@@ -66,8 +99,7 @@ function paintCanTexture(
   ctx.fillStyle = flavor.canColor;
   ctx.fillRect(0, bandTop, w, bandH);
 
-  // logo centralizado, impresso por cima — largura em fração da volta inteira,
-  // altura em fração da faixa pintada (os dois são independentes em 3D).
+  // logo centralizado, impresso por cima
   if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
     const logoW = w * LOGO_WIDTH_FRAC;
     const logoH = bandH * LOGO_HEIGHT_FRAC;
@@ -79,7 +111,6 @@ function paintCanTexture(
 
 export default function RealisticCan({ flavorId }: RealisticCanProps) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -137,10 +168,7 @@ export default function RealisticCan({ flavorId }: RealisticCanProps) {
     logoImg.src = flavor.labelSrc;
 
     // corpo da lata: perfil revolucionado (dá o ombro/base curvos de verdade)
-    const profile = CAN_PROFILE.map(
-      ([r, y]) => new THREE.Vector2(r, y - PROFILE_HEIGHT / 2)
-    );
-    const geometry = new THREE.LatheGeometry(profile, 96);
+    const geometry = new THREE.LatheGeometry(buildCanProfile(), 96);
     geometry.computeVertexNormals();
 
     const material = new THREE.MeshPhysicalMaterial({
@@ -153,41 +181,10 @@ export default function RealisticCan({ flavorId }: RealisticCanProps) {
     });
 
     const can = new THREE.Mesh(geometry, material);
-    can.rotation.y = INITIAL_ROTATION;
-    can.scale.setScalar(0.62);
+    can.rotation.set(START.rotX, START.rotY, START.rotZ);
+    can.position.y = START.posY;
+    can.scale.setScalar(START.scale);
     scene.add(can);
-
-    // ---- interação: arrastar gira só no eixo vertical (sem auto-giro, sem tilt) ----
-    let dragging = false;
-    let lastX = 0;
-    let velocity = 0;
-
-    const setDragging = (v: boolean) => setIsDragging(v);
-
-    const onPointerDown = (e: PointerEvent) => {
-      dragging = true;
-      lastX = e.clientX;
-      velocity = 0;
-      host.setPointerCapture(e.pointerId);
-      setDragging(true);
-    };
-    const onPointerMove = (e: PointerEvent) => {
-      if (!dragging) return;
-      const dx = e.clientX - lastX;
-      lastX = e.clientX;
-      const delta = dx * DRAG_SENSITIVITY;
-      can.rotation.y += delta;
-      velocity = delta;
-    };
-    const endDrag = () => {
-      dragging = false;
-      setDragging(false);
-    };
-
-    host.addEventListener("pointerdown", onPointerDown);
-    host.addEventListener("pointermove", onPointerMove);
-    host.addEventListener("pointerup", endDrag);
-    host.addEventListener("pointercancel", endDrag);
 
     // ---- redimensiona junto com o container (mantém posição/escala do layout) ----
     const resize = () => {
@@ -201,15 +198,31 @@ export default function RealisticCan({ flavorId }: RealisticCanProps) {
     ro.observe(host);
     resize();
 
+    // ---- animação de entrada: dispara quando a lata entra na tela ao rolar ----
+    let entranceStart: number | null = null;
+    let entranceDone = false;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && entranceStart === null) {
+          entranceStart = performance.now();
+          io.disconnect();
+        }
+      },
+      { threshold: 0.2 }
+    );
+    io.observe(host);
+
     let rafId = 0;
     const animate = () => {
-      if (!dragging) {
-        if (Math.abs(velocity) > 0.0001) {
-          can.rotation.y += velocity;
-          velocity *= INERTIA_DECAY;
-        } else {
-          velocity = 0;
-        }
+      if (!entranceDone && entranceStart !== null) {
+        const t = Math.min((performance.now() - entranceStart) / 1000 / ENTRANCE_DURATION, 1);
+        const e = easeOutBack(t);
+        can.rotation.x = THREE.MathUtils.lerp(START.rotX, REST.rotX, e);
+        can.rotation.y = THREE.MathUtils.lerp(START.rotY, REST.rotY, e);
+        can.rotation.z = THREE.MathUtils.lerp(START.rotZ, REST.rotZ, e);
+        can.position.y = THREE.MathUtils.lerp(START.posY, REST.posY, e);
+        can.scale.setScalar(THREE.MathUtils.lerp(START.scale, REST.scale, e));
+        if (t >= 1) entranceDone = true;
       }
       renderer.render(scene, camera);
       rafId = requestAnimationFrame(animate);
@@ -219,10 +232,7 @@ export default function RealisticCan({ flavorId }: RealisticCanProps) {
     return () => {
       cancelAnimationFrame(rafId);
       ro.disconnect();
-      host.removeEventListener("pointerdown", onPointerDown);
-      host.removeEventListener("pointermove", onPointerMove);
-      host.removeEventListener("pointerup", endDrag);
-      host.removeEventListener("pointercancel", endDrag);
+      io.disconnect();
       host.removeChild(renderer.domElement);
       geometry.dispose();
       material.dispose();
@@ -237,9 +247,8 @@ export default function RealisticCan({ flavorId }: RealisticCanProps) {
     <div
       ref={hostRef}
       className={styles.host}
-      data-dragging={isDragging}
       role="img"
-      aria-label={`Lata ${FLAVORS[flavorId].label} em 3D — arraste para girar`}
+      aria-label={`Lata ${FLAVORS[flavorId].label} em 3D`}
     />
   );
 }

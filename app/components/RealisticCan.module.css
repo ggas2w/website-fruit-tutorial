@@ -1,12 +1,7 @@
 .host {
   position: absolute;
   inset: 0;
-  cursor: grab;
-  touch-action: none;
-}
-
-.host[data-dragging="true"] {
-  cursor: grabbing;
+  pointer-events: none;
 }
 
 .host canvas {
