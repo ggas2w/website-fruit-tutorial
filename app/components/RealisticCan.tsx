@@ -35,6 +35,17 @@ const LOGO_WIDTH_FRAC = 0.3;
 /** Esticão extra na altura por cima da proporção natural da imagem. */
 const LOGO_HEIGHT_BOOST = 1.25;
 
+/** A foto do corpo (can-photo.png) é uma foto de FRENTE só, não uma textura
+ * feita pra dar a volta 360° — se ela cobrir a largura toda, o "resto" da
+ * volta (que aparece quando a lata gira) mostra a mesma foto espremida/
+ * esticada de um jeito que não bate com nada, e vira um borrão visível na
+ * parte de trás. Por isso o brilho/gotas do CORPO só aparece numa faixa
+ * central de frente, esmaecendo pras bordas — fora dela fica só a cor
+ * sólida do sabor (as tampas continuam cobrindo a volta toda, isso já
+ * estava certo). */
+const PHOTO_BAND_WIDTH_FRAC = 0.56;
+const PHOTO_BAND_FEATHER_FRAC = 0.16;
+
 const BODY_Y_START = 0.09;
 const BODY_Y_END = 3.55;
 const PROFILE_HEIGHT = 3.93;
@@ -59,7 +70,7 @@ function buildCanProfile(): THREE.Vector2[] {
  * levemente girada, e assenta na pose final em diagonal — sem quique, sem
  * giro contínuo. */
 const REST_ROTATION_Y = Math.PI;
-const ENTRANCE_DURATION = 1.3;
+const ENTRANCE_DURATION = 1.0;
 const START = { rotX: 0.12, rotY: REST_ROTATION_Y - 0.4, rotZ: 0.15, posY: -0.8, scale: 0.46 };
 const REST = { rotX: 0.32, rotY: REST_ROTATION_Y - 0.15, rotZ: -0.26, posY: 0, scale: 0.62 };
 
@@ -112,11 +123,73 @@ function compositeCanTexture(
     ctx.drawImage(labelImg, logoX, logoY, logoW, logoH);
   }
 
-  // a mesma foto de novo, em multiply, pro brilho/sombra/gotas (canShade)
+  // a mesma foto de novo, em multiply, pro brilho/sombra/gotas (canShade).
+  // Nas TAMPAS (fora da faixa do corpo) cobre a volta toda, como sempre —
+  // ali já estava certo. No CORPO, porém, essa foto é de frente só (não foi
+  // feita pra dar 360°): se cobrir a largura toda, o "resto" da volta (que
+  // aparece ao girar, ou até de cara se o ângulo de repouso cair perto da
+  // costura) mostra a mesma foto espremida/repetida e vira um borrão. Por
+  // isso, no corpo, ela só aparece numa faixa central de frente, esmaecendo
+  // pras bordas — fora dela fica só a cor sólida do sabor.
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
   ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  ctx.rect(0, 0, w, bandTop);
+  ctx.rect(0, bandTop + bandH, w, h - (bandTop + bandH));
+  ctx.clip();
   ctx.drawImage(canPhoto, 0, 0, w, h);
+  ctx.restore();
+
+  const photoW = w * PHOTO_BAND_WIDTH_FRAC;
+  const featherW = w * PHOTO_BAND_FEATHER_FRAC;
+  const bandLeft = (w - photoW) / 2;
+  const bandRight = bandLeft + photoW;
+
+  const bodyPhoto = document.createElement("canvas");
+  bodyPhoto.width = w;
+  bodyPhoto.height = bandH;
+  const bpCtx = bodyPhoto.getContext("2d")!;
+  bpCtx.imageSmoothingEnabled = true;
+  bpCtx.imageSmoothingQuality = "high";
+  // recorta do canPhoto só a faixa vertical correspondente ao corpo (canPhoto
+  // é desenhado 1:1 no canvas w×h, então a mesma proporção vale na fonte)
+  const srcScale = canPhoto.naturalHeight / h;
+  bpCtx.drawImage(
+    canPhoto,
+    0,
+    bandTop * srcScale,
+    canPhoto.naturalWidth,
+    bandH * srcScale,
+    0,
+    0,
+    w,
+    bandH
+  );
+  // máscara: opaca só na faixa central de frente, esmaecendo pras bordas
+  bpCtx.globalCompositeOperation = "destination-in";
+  const mask = bpCtx.createLinearGradient(0, 0, w, 0);
+  const stops: Array<[number, number]> = [
+    [0, 0],
+    [Math.max(0, (bandLeft - featherW) / w), 0],
+    [bandLeft / w, 1],
+    [bandRight / w, 1],
+    [Math.min(1, (bandRight + featherW) / w), 0],
+    [1, 0],
+  ];
+  let prevOffset = -1;
+  for (const [offset, alpha] of stops) {
+    const safeOffset = Math.max(prevOffset + 0.0001, Math.min(1, offset));
+    mask.addColorStop(safeOffset, `rgba(0,0,0,${alpha})`);
+    prevOffset = safeOffset;
+  }
+  bpCtx.fillStyle = mask;
+  bpCtx.fillRect(0, 0, w, bandH);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.globalAlpha = 0.85;
+  ctx.drawImage(bodyPhoto, 0, bandTop);
   ctx.restore();
 
   return canvas;
