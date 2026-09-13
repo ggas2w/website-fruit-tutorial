@@ -77,6 +77,16 @@ function easeOutExpo(t: number) {
   return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
 }
 
+/** Retângulo do logo dentro da textura — não depende da imagem ter carregado
+ * (só de frações fixas), então dá pra usar também no mapa de material. */
+function getLogoRect(w: number, h: number) {
+  const bandTop = h * PAINT_BAND_TOP;
+  const bandH = h * PAINT_BAND_HEIGHT;
+  const logoW = w * LOGO_WIDTH_FRAC;
+  const logoH = bandH * LOGO_HEIGHT_FRAC;
+  return { x: (w - logoW) / 2, y: bandTop + (bandH - logoH) / 2, w: logoW, h: logoH, bandTop, bandH };
+}
+
 function paintCanTexture(
   ctx: CanvasRenderingContext2D,
   w: number,
@@ -100,8 +110,7 @@ function paintCanTexture(
   ctx.fillRect(0, 0, w, h);
 
   // corpo pintado na cor sólida do sabor
-  const bandTop = h * PAINT_BAND_TOP;
-  const bandH = h * PAINT_BAND_HEIGHT;
+  const { x: logoX, y: logoY, w: logoW, h: logoH, bandTop, bandH } = getLogoRect(w, h);
   ctx.fillStyle = flavor.canColor;
   ctx.fillRect(0, bandTop, w, bandH);
 
@@ -116,14 +125,57 @@ function paintCanTexture(
     ctx.restore();
   }
 
-  // logo por cima, nítido e em opacidade total — nunca some sob as gotas.
+  // logo por cima, nítido — e então "tingido" com a própria cor da lata,
+  // pra parecer tinta impressa na superfície em vez de um adesivo branco
+  // colado (o branco do rótulo passa a puxar pro tom do sabor, mantendo o
+  // desenho/texto legível).
   if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
-    const logoW = w * LOGO_WIDTH_FRAC;
-    const logoH = bandH * LOGO_HEIGHT_FRAC;
-    const logoX = (w - logoW) / 2;
-    const logoY = bandTop + (bandH - logoH) / 2;
     ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(logoX, logoY, logoW, logoH);
+    ctx.clip();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = flavor.canColor;
+    ctx.fillRect(logoX, logoY, logoW, logoH);
+    ctx.restore();
+
+    // um toque bem sutil das mesmas gotas por cima do rótulo, só pra ele não
+    // parecer "seco"/destacado do resto da lata molhada — sem cobrir o texto.
+    if (dropletsImg && dropletsImg.complete && dropletsImg.naturalWidth > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(logoX, logoY, logoW, logoH);
+      ctx.clip();
+      ctx.globalCompositeOperation = "multiply";
+      ctx.globalAlpha = 0.15;
+      ctx.drawImage(dropletsImg, 0, 0, w, h);
+      ctx.restore();
+    }
   }
+}
+
+/** Mapa de metalness (canal B) / roughness (canal G) — três materiais
+ * diferentes na MESMA lata: alumínio nu (bem metálico e liso), corpo
+ * pintado (bem menos metálico, mais fosco) e a área impressa do rótulo
+ * (quase nada metálico, como tinta/papel). Sem isso a lata inteira reflete
+ * luz igual, e nada "lê" como metal exposto vs. tinta vs. impressão. */
+function paintMaterialMap(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const encode = (roughness: number, metalness: number) =>
+    `rgb(0, ${Math.round(roughness * 255)}, ${Math.round(metalness * 255)})`;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = encode(0.28, 0.9); // alumínio nu: liso e bem metálico
+  ctx.fillRect(0, 0, w, h);
+
+  const { x: logoX, y: logoY, w: logoW, h: logoH, bandTop, bandH } = getLogoRect(w, h);
+  ctx.fillStyle = encode(0.55, 0.3); // corpo pintado: mais fosco, pouco metálico
+  ctx.fillRect(0, bandTop, w, bandH);
+
+  ctx.fillStyle = encode(0.65, 0.08); // rótulo impresso: quase nada metálico
+  ctx.fillRect(logoX, logoY, logoW, logoH);
 }
 
 export default function RealisticCan({ flavorId }: RealisticCanProps) {
@@ -192,17 +244,30 @@ export default function RealisticCan({ flavorId }: RealisticCanProps) {
     logoImg.onload = redraw;
     logoImg.src = flavor.labelSrc;
 
+    // mapa de metalness/roughness — três "materiais" na mesma lata (metal
+    // nu, corpo pintado, rótulo impresso). É dado (não cor), então fica em
+    // espaço linear, não sRGB.
+    const materialCanvas = document.createElement("canvas");
+    materialCanvas.width = TEXTURE_SIZE;
+    materialCanvas.height = TEXTURE_SIZE;
+    paintMaterialMap(materialCanvas.getContext("2d")!, materialCanvas.width, materialCanvas.height);
+    const materialTexture = new THREE.CanvasTexture(materialCanvas);
+    materialTexture.colorSpace = THREE.NoColorSpace;
+    materialTexture.needsUpdate = true;
+
     // corpo da lata: perfil revolucionado (dá o ombro/base curvos de verdade)
     const geometry = new THREE.LatheGeometry(buildCanProfile(), 96);
     geometry.computeVertexNormals();
 
     const material = new THREE.MeshPhysicalMaterial({
       map: texture,
-      metalness: 0.45,
-      roughness: 0.52,
+      metalnessMap: materialTexture,
+      roughnessMap: materialTexture,
+      metalness: 1,
+      roughness: 1,
       clearcoat: 0.12,
       clearcoatRoughness: 0.45,
-      envMapIntensity: 0.45,
+      envMapIntensity: 0.5,
     });
 
     const can = new THREE.Mesh(geometry, material);
@@ -262,6 +327,7 @@ export default function RealisticCan({ flavorId }: RealisticCanProps) {
       geometry.dispose();
       material.dispose();
       texture.dispose();
+      materialTexture.dispose();
       envTexture.dispose();
       pmrem.dispose();
       renderer.dispose();
