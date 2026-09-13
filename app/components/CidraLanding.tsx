@@ -28,23 +28,25 @@ import {
 } from "../data/flavors";
 import styles from "./CidraLanding.module.css";
 
-/** Onde, dentro da altura da lata, o rótulo é desenhado (fração 0-1).
- * Cobre quase toda a lata (só sobra o ombro de cima e a base), como
- * um rótulo impresso de verdade, em vez de uma faixa fina colada no meio. */
-const LABEL_BAND_TOP = 0.09;
-const LABEL_BAND_HEIGHT = 0.82;
-/** Quanto o rótulo "encolhe" na vertical perto das bordas esquerda/direita,
- * simulando a curvatura do cilindro da lata (0 = sem curva, 1 = full). */
-const LABEL_CURVE = 0.12;
-/** Largura de cada fatia desenhada no canvas. */
+/** Onde, dentro da altura da lata, a cor sólida do sabor é pintada (fração 0-1).
+ * Cobre praticamente a lata inteira — só sobra um fiapo de metal no
+ * ombro/base, como uma lata de verdade impressa por completo. */
+const CAN_FILL_TOP = 0.05;
+const CAN_FILL_HEIGHT = 0.92;
+/** Tamanho do logo (só o emblema, não a lata inteira), em fração da largura da lata. */
+const LOGO_WIDTH_FRAC = 0.62;
+/** Centro vertical do logo, em fração da altura da lata. */
+const LOGO_CENTER_Y_FRAC = 0.46;
+/** Largura de cada fatia usada pra "varrer" a cor entre um sabor e outro. */
 const SLICE_PX = 4;
-/** Fade nas bordas esquerda/direita do canvas, em px. */
-const EDGE_FADE_PX = 36;
 /** Spring (mais leve/rápida) usada só pro parallax do mouse. */
 const PARALLAX_SPRING = { stiffness: 55, damping: 14, mass: 0.6 };
 /** Distância de arraste, em px, pra trocar de sabor. */
 const DRAG_THRESHOLD = 70;
 const DRAG_VELOCITY_THRESHOLD = 500;
+
+/** Cor sólida de cada sabor, na mesma ordem de FLAVOR_ORDER. */
+const CAN_COLORS = FLAVOR_ORDER.map((id) => FLAVORS[id].canColor);
 
 function mod(n: number, m: number) {
   return ((n % m) + m) % m;
@@ -250,52 +252,46 @@ export default function CidraLanding() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
-    const bandTop = height * LABEL_BAND_TOP;
-    const bandH = height * LABEL_BAND_HEIGHT;
+    const fillTop = height * CAN_FILL_TOP;
+    const fillH = height * CAN_FILL_HEIGHT;
     const totalStripW = LABEL_WIDTH_PX * FLAVOR_ORDER.length;
     const centerShift = (LABEL_WIDTH_PX - width) / 2;
     const offsetPx = progress.get() * LABEL_WIDTH_PX;
-    const halfWidth = width / 2;
 
+    // pinta o corpo inteiro da lata com a cor sólida do sabor, sabor a sabor,
+    // varrendo de um pro outro durante a troca (a mesma faixa contínua usada
+    // pro fundo/palavra, só que virando um "wipe" de cor em vez de posição).
     for (let x = 0; x < width; x += SLICE_PX) {
       const raw = offsetPx + x + centerShift;
       const stripPos = mod(raw, totalStripW);
       const idx = Math.floor(stripPos / LABEL_WIDTH_PX);
-      const img = labelImgsRef.current[idx];
-      if (!img || !img.complete || img.naturalWidth === 0) continue;
-
-      const localX = stripPos - idx * LABEL_WIDTH_PX;
-      const scale = img.naturalWidth / LABEL_WIDTH_PX;
-      const sx = localX * scale;
-      const sw = Math.max(1, SLICE_PX * scale);
       const dw = Math.min(SLICE_PX, width - x);
-
-      // encolhe a fatia perto das bordas pra simular o rótulo curvando
-      // junto com o cilindro da lata, em vez de ficar reto feito adesivo.
-      const t = (x + dw / 2 - halfWidth) / halfWidth;
-      const taper = 1 - LABEL_CURVE * t * t;
-      const sliceH = bandH * taper;
-      const sliceTop = bandTop + (bandH - sliceH) / 2;
-
-      ctx.drawImage(img, sx, 0, sw, img.naturalHeight, x, sliceTop, dw, sliceH);
+      ctx.fillStyle = CAN_COLORS[idx];
+      ctx.fillRect(x, fillTop, dw, fillH);
     }
 
-    // fade nas bordas: some com o rótulo revelando a sombra natural da lata
-    ctx.globalCompositeOperation = "destination-out";
-
-    const gl = ctx.createLinearGradient(0, 0, EDGE_FADE_PX, 0);
-    gl.addColorStop(0, "rgba(0,0,0,1)");
-    gl.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = gl;
-    ctx.fillRect(0, bandTop, EDGE_FADE_PX, bandH);
-
-    const gr = ctx.createLinearGradient(width - EDGE_FADE_PX, 0, width, 0);
-    gr.addColorStop(0, "rgba(0,0,0,0)");
-    gr.addColorStop(1, "rgba(0,0,0,1)");
-    ctx.fillStyle = gr;
-    ctx.fillRect(width - EDGE_FADE_PX, bandTop, EDGE_FADE_PX, bandH);
-
-    ctx.globalCompositeOperation = "source-over";
+    // logo único, centralizado, do sabor que ocupa o centro da lata agora —
+    // impresso por cima da cor sólida, sem faixa/rótulo separado.
+    const centerStripPos = mod(offsetPx + width / 2 + centerShift, totalStripW);
+    const centerIdx = Math.floor(centerStripPos / LABEL_WIDTH_PX);
+    const logoImg = labelImgsRef.current[centerIdx];
+    if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
+      const logoW = width * LOGO_WIDTH_FRAC;
+      const logoH = logoW * (logoImg.naturalHeight / logoImg.naturalWidth);
+      const logoX = (width - logoW) / 2;
+      const logoY = height * LOGO_CENTER_Y_FRAC - logoH / 2;
+      ctx.drawImage(
+        logoImg,
+        0,
+        0,
+        logoImg.naturalWidth,
+        logoImg.naturalHeight,
+        logoX,
+        logoY,
+        logoW,
+        logoH
+      );
+    }
   }, [imagesReady, canSize, progress]);
 
   useMotionValueEvent(progress, "change", draw);

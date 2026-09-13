@@ -62,6 +62,8 @@ export interface FlavorConfig {
   background: string;
   /** Cor da palavra gigante atrás da lata (precisa contrastar com `background`). */
   wordColor: string;
+  /** Cor sólida "impressa" no corpo inteiro da lata (mesma cor de fundo do rótulo). */
+  canColor: string;
   /** Rótulo plano (636px) usado na faixa do canvas. */
   labelSrc: string;
   fruits: FruitConfig[];
@@ -75,6 +77,7 @@ export const FLAVORS: Record<FlavorId, FlavorConfig> = {
     label: "Pear",
     background: "#c9e78a",
     wordColor: "rgba(255, 255, 255, 0.9)",
+    canColor: "#e6ffde",
     labelSrc: "/label-pear.png",
     fruits: [
       {
@@ -132,6 +135,7 @@ export const FLAVORS: Record<FlavorId, FlavorConfig> = {
     label: "Apple",
     background: "#ffa3be",
     wordColor: "rgba(150, 38, 38, 0.55)",
+    canColor: "#ff6464",
     labelSrc: "/label-apple.png",
     fruits: [
       {
@@ -189,6 +193,7 @@ export const FLAVORS: Record<FlavorId, FlavorConfig> = {
     label: "Exotic",
     background: "#c1beff",
     wordColor: "rgba(255, 255, 255, 0.9)",
+    canColor: "#9494ff",
     labelSrc: "/label-exotic.png",
     fruits: [
       {

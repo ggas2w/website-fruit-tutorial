@@ -55,11 +55,12 @@
 
 .word {
   font-family: var(--font-display), sans-serif;
-  font-size: clamp(5rem, 17vw, 14rem);
+  font-size: clamp(7rem, 24vw, 22rem);
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: -0.02em;
   white-space: nowrap;
+  transform: translateY(-9vh);
 }
 
 /* ---------- frutas ---------- */
