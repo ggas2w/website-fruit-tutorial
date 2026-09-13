@@ -32,10 +32,6 @@ const PAINT_BAND_HEIGHT_V = BODY_SEGMENTS / TOTAL_SEGMENTS;
  * frente, senão fica esticado pelas 360° e a câmera só mostra um pedaço
  * ampliado/cortado dele (era o bug do "logo grande demais/cortado"). */
 const LOGO_WIDTH_FRAC = 0.34;
-/** Mesma proporção largura:altura usada na versão plana (câmera de largura
- * toda x 78% da altura), só que aplicada à largura menor do logo aqui —
- * assim o rótulo não fica nem mais espichado nem mais achatado que antes. */
-const LABEL_FLAT_ASPECT = 639 / (1195 * 0.78);
 
 const BODY_Y_START = 0.09;
 const BODY_Y_END = 3.55;
@@ -108,12 +104,12 @@ function compositeCanTexture(
   ctx.fillRect(0, bandTop, w, bandH);
 
   // rótulo centralizado numa faixa estreita da largura (a fração da volta
-  // inteira que fica de frente pra câmera), na mesma proporção largura:
-  // altura da versão plana — assim ele aparece INTEIRO, sem cortar nas
-  // bordas, em vez de esticado pelas 360° e só um pedaço ampliado visível.
+  // inteira que fica de frente pra câmera) — na proporção NATURAL da
+  // própria imagem (sem esticar/achatar artificialmente), assim ele aparece
+  // INTEIRO e com as formas certas, em vez de espremido pelas 360°.
   if (labelImg && labelImg.complete && labelImg.naturalWidth > 0) {
     const logoW = w * LOGO_WIDTH_FRAC;
-    const logoH = logoW / LABEL_FLAT_ASPECT;
+    const logoH = logoW * (labelImg.naturalHeight / labelImg.naturalWidth);
     const logoX = (w - logoW) / 2;
     const logoY = bandTop + (bandH - logoH) / 2;
     ctx.drawImage(labelImg, logoX, logoY, logoW, logoH);
@@ -127,6 +123,23 @@ function compositeCanTexture(
   ctx.restore();
 
   return canvas;
+}
+
+/** Mapa de metalness (canal B) / roughness (canal G): alumínio nu (liso e
+ * bem metálico, pra refletir o ambiente de verdade — é isso que lê como
+ * "metal", não só brilho) no topo/base, e corpo pintado quase nada
+ * metálico (fosco, cor vívida — metalness demais lava a cor da tinta). */
+function paintMaterialMap(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const encode = (roughness: number, metalness: number) =>
+    `rgb(0, ${Math.round(roughness * 255)}, ${Math.round(metalness * 255)})`;
+
+  ctx.fillStyle = encode(0.25, 0.9); // alumínio nu: liso e bem metálico
+  ctx.fillRect(0, 0, w, h);
+
+  const bandTop = h * (1 - (PAINT_BAND_TOP_V + PAINT_BAND_HEIGHT_V));
+  const bandH = h * PAINT_BAND_HEIGHT_V;
+  ctx.fillStyle = encode(0.55, 0.04); // corpo pintado: fosco, quase nada metálico
+  ctx.fillRect(0, bandTop, w, bandH);
 }
 
 export default function RealisticCan({ flavorId }: RealisticCanProps) {
@@ -146,36 +159,47 @@ export default function RealisticCan({ flavorId }: RealisticCanProps) {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.85;
+    renderer.toneMappingExposure = 1;
     host.appendChild(renderer.domElement);
 
-    // ambiente bem discreto — só o suficiente pra um leve realce metálico
-    // nos aros, sem competir com a foto original (que já tem o próprio
-    // brilho/gotas "assados" na imagem). A foto já vem com a ponta de cima
-    // bem clara/estourada — luz demais em cima disso vira branco chapado
-    // (era o "metálico bugado"), por isso as intensidades aqui são baixas.
+    // ambiente de estúdio — dá aos aros de alumínio nu um reflexo de
+    // verdade (é isso que faz "ler" como metal, não só brilho/branco).
     const pmrem = new THREE.PMREMGenerator(renderer);
-    const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.12).texture;
+    const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.1).texture;
     scene.environment = envTexture;
 
-    const key = new THREE.DirectionalLight(0xffffff, 0.7);
+    const key = new THREE.DirectionalLight(0xffffff, 0.8);
     key.position.set(3, 3.5, 5);
     scene.add(key);
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.35);
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.4);
     fillLight.position.set(-4, -1, 2.5);
     scene.add(fillLight);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
     // corpo da lata: perfil revolucionado (ombro/base curvos de verdade)
     const geometry = new THREE.LatheGeometry(buildCanProfile(), 96);
     geometry.computeVertexNormals();
 
+    // mapa de metalness/roughness próprio, em espaço linear (é dado, não
+    // cor) — separa o alumínio nu (reflexivo) do corpo pintado (fosco, cor
+    // vívida). Sem isso, um metalness único deixa a lata inteira ou "lavada"
+    // (metal alto demais) ou sem cara de metal nenhuma (metal baixo demais).
+    const materialCanvas = document.createElement("canvas");
+    materialCanvas.width = 512;
+    materialCanvas.height = 512;
+    paintMaterialMap(materialCanvas.getContext("2d")!, materialCanvas.width, materialCanvas.height);
+    const materialTexture = new THREE.CanvasTexture(materialCanvas);
+    materialTexture.colorSpace = THREE.NoColorSpace;
+    materialTexture.needsUpdate = true;
+
     const material = new THREE.MeshPhysicalMaterial({
-      metalness: 0.22,
-      roughness: 0.6,
-      clearcoat: 0.08,
-      clearcoatRoughness: 0.5,
-      envMapIntensity: 0.3,
+      metalnessMap: materialTexture,
+      roughnessMap: materialTexture,
+      metalness: 1,
+      roughness: 1,
+      clearcoat: 0.1,
+      clearcoatRoughness: 0.4,
+      envMapIntensity: 0.9,
     });
 
     const can = new THREE.Mesh(geometry, material);
@@ -265,6 +289,7 @@ export default function RealisticCan({ flavorId }: RealisticCanProps) {
       geometry.dispose();
       material.dispose();
       texture?.dispose();
+      materialTexture.dispose();
       envTexture.dispose();
       pmrem.dispose();
       renderer.dispose();
