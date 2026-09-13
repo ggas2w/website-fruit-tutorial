@@ -69,8 +69,8 @@ function buildCanProfile(): THREE.Vector2[] {
  * giro contínuo. */
 const REST_ROTATION_Y = Math.PI;
 const ENTRANCE_DURATION = 1.3;
-const START = { rotX: 0.12, rotY: REST_ROTATION_Y - 0.4, rotZ: 0.15, posY: -0.9, scale: 0.5 };
-const REST = { rotX: 0.32, rotY: REST_ROTATION_Y - 0.15, rotZ: -0.26, posY: 0, scale: 0.68 };
+const START = { rotX: 0.12, rotY: REST_ROTATION_Y - 0.4, rotZ: 0.15, posY: -0.8, scale: 0.46 };
+const REST = { rotX: 0.32, rotY: REST_ROTATION_Y - 0.15, rotZ: -0.26, posY: 0, scale: 0.62 };
 
 function easeOutExpo(t: number) {
   return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
@@ -146,34 +146,36 @@ export default function RealisticCan({ flavorId }: RealisticCanProps) {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1;
+    renderer.toneMappingExposure = 0.85;
     host.appendChild(renderer.domElement);
 
     // ambiente bem discreto — só o suficiente pra um leve realce metálico
     // nos aros, sem competir com a foto original (que já tem o próprio
-    // brilho/gotas "assados" na imagem).
+    // brilho/gotas "assados" na imagem). A foto já vem com a ponta de cima
+    // bem clara/estourada — luz demais em cima disso vira branco chapado
+    // (era o "metálico bugado"), por isso as intensidades aqui são baixas.
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.12).texture;
     scene.environment = envTexture;
 
-    const key = new THREE.DirectionalLight(0xffffff, 1.1);
+    const key = new THREE.DirectionalLight(0xffffff, 0.7);
     key.position.set(3, 3.5, 5);
     scene.add(key);
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.55);
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.35);
     fillLight.position.set(-4, -1, 2.5);
     scene.add(fillLight);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.45));
 
     // corpo da lata: perfil revolucionado (ombro/base curvos de verdade)
     const geometry = new THREE.LatheGeometry(buildCanProfile(), 96);
     geometry.computeVertexNormals();
 
     const material = new THREE.MeshPhysicalMaterial({
-      metalness: 0.3,
-      roughness: 0.55,
-      clearcoat: 0.15,
-      clearcoatRoughness: 0.4,
-      envMapIntensity: 0.5,
+      metalness: 0.22,
+      roughness: 0.6,
+      clearcoat: 0.08,
+      clearcoatRoughness: 0.5,
+      envMapIntensity: 0.3,
     });
 
     const can = new THREE.Mesh(geometry, material);
@@ -190,7 +192,7 @@ export default function RealisticCan({ flavorId }: RealisticCanProps) {
 
     const rebuildTexture = () => {
       if (!canPhoto.complete || canPhoto.naturalWidth === 0) return;
-      const w = 1024;
+      const w = 1536;
       const h = Math.round((w * canPhoto.naturalHeight) / canPhoto.naturalWidth);
       const composed = compositeCanTexture(canPhoto, labelImg, flavor.canColor, w, h);
       if (texture) texture.dispose();
